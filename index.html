@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>环球基金行情看板 · Global Fund Monitor</title>
+<meta name="description" content="国内外基金与指数涨跌监控看板" />
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --bg:#04070f;
+    --bg2:#0a1222;
+    --panel:rgba(16,26,47,.72);
+    --panel-2:rgba(22,34,60,.55);
+    --line:rgba(122,152,214,.14);
+    --line-strong:rgba(122,152,214,.32);
+    --txt:#e9eefb;
+    --muted:#8ba1c8;
+    --muted-2:#5d7296;
+    --gold:#f2c14e;
+    --gold-2:#d4a12a;
+    --cyan:#2ae0d0;
+    --blue:#4f8cff;
+    --up:#ff4d5e;
+    --down:#1fc98a;
+    --flat:#8ba1c8;
+    --shadow:0 18px 50px -22px rgba(0,0,0,.9);
+    --mono:"JetBrains Mono","SFMono-Regular","SF Mono",ui-monospace,Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:var(--sans);
+    color:var(--txt);
+    background:
+      radial-gradient(1100px 620px at 8% -8%,rgba(58,110,255,.16),transparent 60%),
+      radial-gradient(900px 560px at 100% 0%,rgba(42,224,208,.10),transparent 58%),
+      radial-gradient(820px 620px at 50% 120%,rgba(242,193,78,.08),transparent 60%),
+      linear-gradient(180deg,var(--bg) 0%,var(--bg2) 55%,#060b16 100%);
+    background-attachment:fixed;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    font-variant-numeric:tabular-nums;
+    letter-spacing:.01em;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+    background-image:linear-gradient(rgba(122,152,214,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(122,152,214,.045) 1px,transparent 1px);
+    background-size:46px 46px;
+    mask-image:radial-gradient(1200px 800px at 50% 0%,#000 30%,transparent 85%);
+  }
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:rgba(122,152,214,.22);border-radius:20px;border:2px solid transparent;background-clip:padding-box}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(122,152,214,.4);background-clip:padding-box}
+  a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,th:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:6px}
+
+  .wrap{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:0 22px}
+
+  /* ================= PROGRESS ================= */
+  .progress{position:fixed;top:0;left:0;height:2px;width:0;z-index:80;background:linear-gradient(90deg,var(--gold),var(--cyan));box-shadow:0 0 12px rgba(42,224,208,.75);transition:width .12s linear}
+  .progress.paused{opacity:.25}
+
+  /* ================= HEADER ================= */
+  header{position:sticky;top:0;z-index:50;backdrop-filter:blur(18px);background:linear-gradient(180deg,rgba(5,9,18,.92),rgba(5,9,18,.68));border-bottom:1px solid var(--line)}
+  .topbar{display:flex;align-items:center;gap:18px;padding:14px 22px;max-width:1440px;margin:0 auto;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;margin-right:auto}
+  .logo{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-family:var(--mono);color:#08101f;
+    background:linear-gradient(135deg,var(--gold),var(--gold-2) 60%,#b9831c);box-shadow:0 8px 26px -8px rgba(242,193,78,.7),inset 0 1px 0 rgba(255,255,255,.5)}
+  .brand h1{font-size:17px;font-weight:700;letter-spacing:.02em;white-space:nowrap}
+  .brand .sub{font-size:10.5px;color:var(--muted-2);font-family:var(--mono);letter-spacing:.24em;text-transform:uppercase;margin-top:2px}
+  nav{display:flex;gap:4px;background:rgba(10,18,34,.7);border:1px solid var(--line);padding:4px;border-radius:12px}
+  nav a{color:var(--muted);text-decoration:none;font-size:13.5px;padding:8px 15px;border-radius:9px;transition:.22s;font-weight:600;white-space:nowrap}
+  nav a:hover{color:var(--txt);background:rgba(122,152,214,.1)}
+  nav a.active{color:#08101f;background:linear-gradient(135deg,var(--gold),var(--gold-2));box-shadow:0 6px 18px -8px rgba(242,193,78,.8)}
+  .statusbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;padding:6px 11px;border-radius:9px;border:1px solid var(--line);background:var(--panel-2);color:var(--muted);font-weight:600;white-space:nowrap}
+  .badge .dot{width:7px;height:7px;border-radius:50%;background:var(--muted-2)}
+  .badge.live{color:var(--down);border-color:rgba(31,201,138,.35)}
+  .badge.live .dot{background:var(--down);box-shadow:0 0 0 0 rgba(31,201,138,.6);animation:pulse 1.8s infinite}
+  .badge.closed{color:var(--muted-2)}
+  .badge.closed .dot{background:var(--muted-2)}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(31,201,138,.55)}70%{box-shadow:0 0 0 7px rgba(31,201,138,0)}100%{box-shadow:0 0 0 0 rgba(31,201,138,0)}}
+  .stamp{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);font-family:var(--mono);border:1px solid var(--line);background:var(--panel-2);padding:5px 6px 5px 11px;border-radius:9px}
+  .stamp .ring{width:14px;height:14px;position:relative;flex:none}
+  .stamp .ring::before{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid rgba(42,224,208,.2)}
+  .stamp .ring::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid transparent;border-top-color:var(--cyan);animation:spin 1.4s linear infinite}
+  .stamp.paused .ring::after{animation-play-state:paused;border-top-color:var(--gold)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .iconbtn{cursor:pointer;border:1px solid var(--line);background:rgba(122,152,214,.08);color:var(--muted);width:26px;height:26px;border-radius:7px;display:grid;place-items:center;transition:.2s;flex:none}
+  .iconbtn:hover{color:var(--txt);border-color:var(--line-strong);background:rgba(122,152,214,.16)}
+  .iconbtn.paused{color:var(--gold);border-color:rgba(242,193,78,.45)}
+
+  /* ================= SECTION ================= */
+  section{padding:34px 0 6px;scroll-margin-top:112px}
+  .sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+  .sec-title{display:flex;align-items:center;gap:11px}
+  .sec-title .bar{width:4px;height:22px;border-radius:3px;background:linear-gradient(180deg,var(--gold),var(--cyan))}
+  .sec-title h2{font-size:19px;font-weight:700;letter-spacing:.02em}
+  .sec-title .en{font-size:10.5px;color:var(--muted-2);font-family:var(--mono);letter-spacing:.22em;text-transform:uppercase}
+  .sec-desc{font-size:12.5px;color:var(--muted-2)}
+
+  /* ================= CARDS ================= */
+  .glass{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);backdrop-filter:blur(10px)}
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s cubic-bezier(.22,1,.36,1)}
+  .reveal.in{opacity:1;transform:none}
+
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+  .stat{padding:18px 20px;position:relative;overflow:hidden}
+  .stat::after{content:"";position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(122,152,214,.12),transparent 70%)}
+  .stat .k{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .stat .k .ic{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:12px;font-weight:800}
+  .stat .v{font-family:var(--mono);font-size:30px;font-weight:700;margin-top:10px;line-height:1;letter-spacing:-.01em}
+  .stat .s{font-size:12px;color:var(--muted-2);margin-top:9px}
+  .u{color:var(--up)!important}
+  .d{color:var(--down)!important}
+  .f{color:var(--flat)!important}
+
+  .idx-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .idx{padding:16px 16px 12px;position:relative;overflow:hidden;transition:transform .3s,border-color .3s,box-shadow .3s;cursor:pointer}
+  .idx:hover{transform:translateY(-4px);border-color:var(--line-strong)}
+  .idx:active{transform:translateY(-1px)}
+  .idx.picked{border-color:rgba(242,193,78,.5);box-shadow:inset 3px 0 0 var(--gold),var(--shadow)}
+  .idx .row1{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .idx .nm{font-size:14px;font-weight:700}
+  .idx .code{font-size:10.5px;color:var(--muted-2);font-family:var(--mono);margin-top:2px;letter-spacing:.06em}
+  .chip{font-size:11.5px;font-family:var(--mono);font-weight:700;padding:4px 8px;border-radius:8px;white-space:nowrap}
+  .chip.u{background:rgba(255,77,94,.13);color:var(--up)}
+  .chip.d{background:rgba(31,201,138,.13);color:var(--down)}
+  .chip.f{background:rgba(139,161,200,.12);color:var(--muted)}
+  .idx .pt{margin-top:14px;display:flex;align-items:baseline;font-family:var(--mono);font-size:27px;font-weight:700;line-height:1;letter-spacing:-.01em}
+  .idx .pt .unit{font-size:12px;color:var(--muted-2);font-weight:500;margin-left:6px;font-family:var(--sans)}
+  .idx .meta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted-2);margin-top:10px;font-family:var(--mono)}
+  .idx .spark{margin-top:10px;height:36px}
+  .idx .spark svg{width:100%;height:100%;display:block;overflow:visible}
+
+  /* odometer */
+  .odometer{display:inline-flex;align-items:baseline;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .odigit{display:inline-block;height:1em;overflow:hidden;line-height:1;vertical-align:baseline}
+  .ostrip{display:flex;flex-direction:column;transition:transform .75s cubic-bezier(.2,.9,.25,1)}
+  .ostrip span{height:1em;line-height:1;display:block}
+  .osep{display:inline-block;height:1em;line-height:1}
+
+  /* ================= RANKING ================= */
+  .rank-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .rank{padding:16px 18px 8px;overflow:hidden}
+  .rank .rh{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:6px}
+  .rank .rh .t{display:flex;align-items:center;gap:9px;font-size:14.5px;font-weight:700}
+  .rank .rh .t .fl{width:8px;height:8px;border-radius:2px;transform:rotate(45deg)}
+  .rank .rh .live{font-size:11px;color:var(--muted-2);font-family:var(--mono);display:flex;align-items:center;gap:6px}
+  .rank .rh .live i{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:pulse2 1.6s infinite}
+  @keyframes pulse2{0%,100%{opacity:1}50%{opacity:.25}}
+  .rlist{position:relative;overflow:hidden}
+  .rtrack{display:flex;flex-direction:column;will-change:transform}
+  .ritem{display:grid;grid-template-columns:30px 1fr auto auto;gap:12px;align-items:center;height:47px;padding:0 6px;border-bottom:1px dashed rgba(122,152,214,.1)}
+  .ritem:last-child{border-bottom:0}
+  .rbadge{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-family:var(--mono);font-size:12px;font-weight:700;background:rgba(122,152,214,.1);color:var(--muted)}
+  .ritem:nth-child(1) .rbadge{background:linear-gradient(135deg,var(--gold),var(--gold-2));color:#08101f}
+  .ritem:nth-child(2) .rbadge{background:rgba(226,232,240,.75);color:#08101f}
+  .ritem:nth-child(3) .rbadge{background:rgba(205,127,50,.75);color:#08101f}
+  .rname{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rname small{color:var(--muted-2);font-family:var(--mono);font-size:10.5px;margin-left:6px}
+  .rval{font-family:var(--mono);font-size:13.5px;font-weight:700}
+  .rpct{font-family:var(--mono);font-size:13.5px;font-weight:700;min-width:66px;text-align:right}
+
+  /* ================= FUNDS ================= */
+  .funds{padding:16px 18px 10px}
+  .fund-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab{cursor:pointer;font-size:13px;font-weight:600;padding:8px 16px;border-radius:10px;border:1px solid var(--line);background:rgba(10,18,34,.6);color:var(--muted);transition:.22s}
+  .tab:hover{color:var(--txt);border-color:var(--line-strong)}
+  .tab.on{color:#08101f;background:linear-gradient(135deg,var(--cyan),#1fa8b8);border-color:transparent;box-shadow:0 8px 22px -10px rgba(42,224,208,.8)}
+  .tab .cnt{font-family:var(--mono);font-size:11px;opacity:.75;margin-left:6px}
+  .ftools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .search{position:relative}
+  .search .si{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted-2);font-size:13px;pointer-events:none}
+  .search input{background:rgba(10,18,34,.7);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:9px 12px 9px 32px;font-size:13px;font-family:var(--sans);width:210px;transition:.2s}
+  .search input:focus{border-color:var(--cyan);outline:none}
+  .search input::placeholder{color:var(--muted-2)}
+  select.sortsel{background:rgba(10,18,34,.7);border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:9px 12px;font-size:13px;font-family:var(--sans);cursor:pointer;transition:.2s}
+  select.sortsel:hover{border-color:var(--line-strong);color:var(--txt)}
+  .table-scroll{overflow-x:auto;margin:0 -4px}
+  table{width:100%;border-collapse:collapse;min-width:840px}
+  thead th{position:sticky;top:0;font-size:11.5px;color:var(--muted);font-weight:600;text-align:right;padding:10px 12px;white-space:nowrap;
+    border-bottom:1px solid var(--line-strong);background:rgba(10,17,32,.96);cursor:pointer;user-select:none;transition:.2s}
+  thead th:first-child,thead th:nth-child(2){text-align:left}
+  thead th:hover{color:var(--gold)}
+  thead th .arr{font-family:var(--mono);font-size:10px;margin-left:4px;color:var(--gold);opacity:0}
+  thead th.sorted .arr{opacity:1}
+  tbody td{padding:12px;font-size:13px;text-align:right;border-bottom:1px solid rgba(122,152,214,.08);font-family:var(--mono);white-space:nowrap}
+  tbody td:first-child,tbody td:nth-child(2){text-align:left}
+  tbody tr{transition:background .2s}
+  tbody tr:hover{background:rgba(122,152,214,.06)}
+  tbody tr.fadein{animation:rowIn .45s ease both}
+  @keyframes rowIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+  .fname{font-family:var(--sans);font-weight:600;font-size:13.5px}
+  .fname small{display:block;color:var(--muted-2);font-family:var(--mono);font-size:10.5px;font-weight:500;margin-top:2px}
+  .tag{font-family:var(--sans);font-size:11px;font-weight:600;padding:3px 9px;border-radius:7px;background:rgba(79,140,255,.13);color:#7fb0ff;display:inline-block;white-space:nowrap}
+  .tag.gold{background:rgba(242,193,78,.14);color:var(--gold)}
+  .tag.cyan{background:rgba(42,224,208,.13);color:var(--cyan)}
+  .minisvg{display:inline-block;vertical-align:middle;width:92px;height:26px}
+  td.flash-u{animation:flashUp 1s ease}
+  td.flash-d{animation:flashDown 1s ease}
+  @keyframes flashUp{0%{background:rgba(255,77,94,.24)}100%{background:transparent}}
+  @keyframes flashDown{0%{background:rgba(31,201,138,.22)}100%{background:transparent}}
+  .empty{text-align:center;color:var(--muted-2);font-family:var(--sans);padding:34px 0}
+
+  /* mobile fund cards */
+  .fund-cards{display:none;flex-direction:column;gap:10px}
+  .fcard{border:1px solid var(--line);border-radius:13px;padding:13px 14px;background:rgba(10,18,34,.5)}
+  .fcard .ftop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .fcard .fprice{font-family:var(--mono);font-size:21px;font-weight:700;margin-top:9px;display:flex;align-items:baseline;gap:12px}
+  .fcard .fprice [data-chg]{font-size:14px}
+  .fcard .fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;font-size:11px;color:var(--muted-2)}
+  .fcard .fgrid b{display:block;font-family:var(--mono);font-size:13.5px;margin-top:4px}
+  .fcard .fspark{margin-top:10px;height:30px}
+  .fcard .fspark svg{width:100%;height:100%;display:block;overflow:visible}
+
+  /* ================= COMPARE ================= */
+  .compare{padding:18px}
+  .cp-top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .cchip{cursor:pointer;font-size:12px;font-weight:600;padding:7px 13px;border-radius:20px;border:1px solid var(--line);background:rgba(10,18,34,.6);color:var(--muted);transition:.22s;display:inline-flex;align-items:center;gap:7px;user-select:none}
+  .cchip .sw{width:9px;height:9px;border-radius:50%;background:var(--muted-2);transition:.22s}
+  .cchip.on{color:var(--txt);border-color:var(--line-strong);background:rgba(122,152,214,.12)}
+  .cchip.on .sw{box-shadow:0 0 8px 1px currentColor}
+  .seg{display:flex;gap:3px;background:rgba(10,18,34,.7);border:1px solid var(--line);padding:3px;border-radius:10px}
+  .seg button{cursor:pointer;border:0;background:transparent;color:var(--muted);font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:8px;transition:.22s;font-family:var(--sans)}
+  .seg button.on{background:linear-gradient(135deg,var(--gold),var(--gold-2));color:#08101f}
+  #chart{width:100%;height:430px}
+  .chart-fallback{display:none;height:430px;place-items:center;color:var(--muted-2);font-size:13px;text-align:center;line-height:2}
+  .chart-fallback.show{display:grid}
+  .hint{font-size:11.5px;color:var(--muted-2);margin-top:2px}
+
+  footer{margin-top:60px;border-top:1px solid var(--line);background:linear-gradient(180deg,transparent,rgba(9,16,31,.55));color:var(--muted-2);font-size:12.5px}
+  .foot{padding-top:38px;padding-bottom:46px}
+  .foot-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .foot-block{padding:18px 20px;border:1px solid var(--line);border-radius:14px;background:rgba(10,18,34,.45)}
+  .foot-h{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;color:var(--muted);letter-spacing:.03em;margin-bottom:12px}
+  .foot-h::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--cyan)}
+  .foot-block.warn .foot-h::before{background:var(--gold)}
+  .foot-block p{line-height:2.05}
+  .foot-block.warn p{color:#d9b45e}
+  .foot-bottom{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:26px;padding-top:20px;border-top:1px solid var(--line);font-size:12px;color:var(--muted-2);font-family:var(--mono)}
+  @media (max-width:700px){.foot-grid{grid-template-columns:1fr;gap:14px}}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);opacity:0;pointer-events:none;transition:.4s;z-index:99;
+    background:rgba(10,18,34,.95);border:1px solid var(--line-strong);color:var(--txt);font-size:12.5px;padding:10px 16px;border-radius:11px;box-shadow:var(--shadow);font-family:var(--mono)}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* ================= RESPONSIVE ================= */
+  @media (max-width:1180px){.idx-grid{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:900px){
+    .stats{grid-template-columns:1fr}
+    .rank-grid{grid-template-columns:1fr}
+    #chart,.chart-fallback{height:340px}
+    nav{order:3;width:100%;overflow-x:auto}
+  }
+  @media (max-width:640px){
+    .wrap{padding:0 14px}
+    .topbar{padding:12px 14px;gap:10px}
+    .brand h1{font-size:15px}
+    .brand .sub{display:none}
+    .idx-grid{grid-template-columns:1fr}
+    .idx .pt{font-size:24px}
+    .stat .v{font-size:26px}
+    section{padding-top:26px}
+    .statusbar{gap:6px}
+    .badge{font-size:11px;padding:5px 9px}
+    .stamp{font-size:11px}
+    .table-scroll{display:none}
+    .fund-cards{display:flex}
+    .search input{width:100%}
+    .search{flex:1}
+    .fund-toolbar{gap:10px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+    .ostrip{transition:none!important}
+    .stamp .ring::after{animation:none}
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="progress" aria-hidden="true"></div>
+<header>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">G$</div>
+      <div>
+        <h1>环球基金行情看板</h1>
+        <div class="sub">Global Fund Monitor</div>
+      </div>
+    </div>
+    <nav id="nav">
+      <a href="#overview" class="active">总览</a>
+      <a href="#ranking">涨跌榜</a>
+      <a href="#funds">基金列表</a>
+      <a href="#compare">趋势对比</a>
+    </nav>
+    <div class="statusbar" id="statusbar"></div>
+    <div class="stamp" id="stampBox">
+      <span class="ring"></span>
+      <span>刷新 <span id="stamp" aria-live="polite">--:--:--</span></span>
+      <button class="iconbtn" id="pauseBtn" title="暂停自动刷新" aria-label="暂停自动刷新"></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- 总览 -->
+  <section id="overview">
+    <div class="sec-head">
+      <div class="sec-title"><span class="bar"></span><div><h2>市场总览</h2><div class="en">Market Overview</div></div></div>
+      <div class="sec-desc">全球主要指数与商品实时快照 · 红涨绿跌 · 点击卡片加入趋势对比</div>
+    </div>
+    <div class="stats">
+      <div class="stat glass reveal">
+        <div class="k"><span class="ic" style="background:rgba(255,77,94,.16);color:var(--up)">↑</span>今日上涨</div>
+        <div class="v u" id="statUp">0</div>
+        <div class="s" id="statUpSub">—</div>
+      </div>
+      <div class="stat glass reveal">
+        <div class="k"><span class="ic" style="background:rgba(31,201,138,.16);color:var(--down)">↓</span>今日下跌</div>
+        <div class="v d" id="statDown">0</div>
+        <div class="s" id="statDownSub">—</div>
+      </div>
+      <div class="stat glass reveal">
+        <div class="k"><span class="ic" style="background:rgba(242,193,78,.16);color:var(--gold)">≈</span>平均涨跌</div>
+        <div class="v" id="statAvg">0.00%</div>
+        <div class="s" id="statAvgSub">—</div>
+      </div>
+    </div>
+    <div class="idx-grid" id="idxGrid"></div>
+  </section>
+
+  <!-- 涨跌榜 -->
+  <section id="ranking">
+    <div class="sec-head">
+      <div class="sec-title"><span class="bar"></span><div><h2>今日涨跌榜</h2><div class="en">Top Movers</div></div></div>
+      <div class="sec-desc">涨幅榜 / 跌幅榜 TOP6 · 每 4 秒自动轮播</div>
+    </div>
+    <div class="rank-grid">
+      <div class="rank glass reveal">
+        <div class="rh"><div class="t"><span class="fl" style="background:var(--up)"></span>涨幅榜 TOP 6</div><div class="live"><i></i>自动轮播</div></div>
+        <div class="rlist" id="gainList"></div>
+      </div>
+      <div class="rank glass reveal">
+        <div class="rh"><div class="t"><span class="fl" style="background:var(--down)"></span>跌幅榜 TOP 6</div><div class="live"><i></i>自动轮播</div></div>
+        <div class="rlist" id="lossList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 基金列表 -->
+  <section id="funds">
+    <div class="sec-head">
+      <div class="sec-title"><span class="bar"></span><div><h2>基金列表</h2><div class="en">Fund Watchlist</div></div></div>
+      <div class="sec-desc" id="fundCount">点击表头排序 · 覆盖国内宽基 / 海外 QDII / 黄金商品</div>
+    </div>
+    <div class="funds glass reveal">
+      <div class="fund-toolbar">
+        <div class="tabs" id="tabs"></div>
+        <div class="ftools">
+          <label class="search">
+            <span class="si">⌕</span>
+            <input id="fundSearch" type="search" placeholder="搜索基金名称 / 代码" aria-label="搜索基金" />
+          </label>
+          <select class="sortsel" id="sortSel" aria-label="排序方式">
+            <option value="chg">按日涨跌</option>
+            <option value="nav">按最新净值</option>
+            <option value="m1">按近1月</option>
+            <option value="m3">按近3月</option>
+            <option value="y1">按近1年</option>
+            <option value="name">按名称</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr id="theadRow">
+              <th data-key="name" data-type="str" tabindex="0">名称<span class="arr">▲</span></th>
+              <th data-key="type" data-type="str" tabindex="0">类型<span class="arr">▲</span></th>
+              <th data-key="nav" data-type="num" tabindex="0">最新净值<span class="arr">▲</span></th>
+              <th data-key="chg" data-type="num" tabindex="0">日涨跌<span class="arr">▲</span></th>
+              <th data-key="m1" data-type="num" tabindex="0">近1月<span class="arr">▲</span></th>
+              <th data-key="m3" data-type="num" tabindex="0">近3月<span class="arr">▲</span></th>
+              <th data-key="y1" data-type="num" tabindex="0">近1年<span class="arr">▲</span></th>
+              <th data-key="trend" data-type="none">近30日走势</th>
+            </tr>
+          </thead>
+          <tbody id="fundBody"></tbody>
+        </table>
+      </div>
+      <div class="fund-cards" id="fundCards"></div>
+    </div>
+  </section>
+
+  <!-- 趋势对比 -->
+  <section id="compare">
+    <div class="sec-head">
+      <div class="sec-title"><span class="bar"></span><div><h2>趋势对比</h2><div class="en">Trend Comparison</div></div></div>
+      <div class="sec-desc">首日归一化为 100 · 便于跨市场横向比较</div>
+    </div>
+    <div class="compare glass reveal">
+      <div class="cp-top">
+        <div class="chips" id="chips"></div>
+        <div class="seg" id="periodSeg">
+          <button data-p="14">近2周</button>
+          <button data-p="30" class="on">近1月</button>
+        </div>
+      </div>
+      <div id="chart"></div>
+      <div class="chart-fallback" id="chartFallback">图表库（ECharts CDN）加载失败，趋势对比图暂时无法显示。<br>请检查网络连接后刷新页面。</div>
+      <div class="hint">提示：点击上方总览中的指数卡片，或在趋势区勾选标的（最多 6 条）。</div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div class="foot-grid">
+      <div class="foot-block">
+        <div class="foot-h">数据来源</div>
+        <p>本页为演示环境，行情与净值数据由前端模拟引擎生成，仅用于交互与视觉展示，不代表任何真实市场报价。指数点位、基金净值及涨跌幅均非实时行情。</p>
+      </div>
+      <div class="foot-block warn">
+        <div class="foot-h">风险提示</div>
+        <p>基金过往业绩及其净值高低不预示未来表现，投资有风险，入市需谨慎。本页不构成任何投资建议。市场有波动，请以基金公司及交易所官方披露数据为准。</p>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© <span id="year"></span> Global Fund Monitor</span>
+      <span>行情看板演示版 · 数据每 6 秒模拟刷新</span>
+    </div>
+  </div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================================
+   工具函数
+   ========================================================================= */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmt = (v, d = 2) => v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtPct = (v, d = 2) => (v >= 0 ? '+' : '') + v.toFixed(d) + '%';
+const dirClass = v => (v > 0.0001 ? 'u' : v < -0.0001 ? 'd' : 'f');
+const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* 生成一段随机游走走势序列 */
+function genSeries(seed, len, start, vol, drift) {
+  const rnd = mulberry32(seed);
+  const out = [];
+  let v = start;
+  for (let i = 0; i < len; i++) {
+    const shock = (rnd() + rnd() + rnd() - 1.5) * vol;
+    v = v * (1 + drift + shock);
+    out.push(v);
+  }
+  return out;
+}
+
+/* 迷你趋势折线 SVG */
+function sparkSVG(data, color, fill = true) {
+  if (!data || data.length < 2) return '';
+  const w = 100, h = 30, pad = 2;
+  const min = Math.min(...data), max = Math.max(...data);
+  const span = (max - min) || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * (w - pad * 2) + pad;
+    const y = h - pad - ((v - min) / span) * (h - pad * 2);
+    return [x, y];
+  });
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(2) + ' ' + p[1].toFixed(2)).join(' ');
+  const area = line + ` L ${pts[pts.length - 1][0].toFixed(2)} ${h} L ${pts[0][0].toFixed(2)} ${h} Z`;
+  const id = 'g' + Math.random().toString(36).slice(2, 8);
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+    ${fill ? `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${color}" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+    </linearGradient></defs><path d="${area}" fill="url(#${id})"/>` : ''}
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+/* 键盘/点击激活 */
+function onActivate(el, fn) {
+  el.setAttribute('tabindex', '0');
+  el.addEventListener('click', fn);
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); fn(e); }
+  });
+}
+
+/* =========================================================================
+   odometer 数字滚动组件
+   ========================================================================= */
+class Odometer {
+  constructor(el, opts = {}) {
+    this.el = el;
+    this.decimals = opts.decimals ?? 2;
+    this.el.classList.add('odometer');
+    this._str = null;
+    this._cols = [];
+  }
+  format(v) {
+    const s = Math.abs(v).toFixed(this.decimals);
+    const parts = s.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return parts.join('.');
+  }
+  set(v) {
+    const str = this.format(v);
+    if (str === this._str) return;
+    const rebuild = this._str === null || str.length !== this._str.length;
+    if (rebuild) {
+      this.el.innerHTML = '';
+      this._cols = [];
+      for (const ch of str) {
+        if (/\d/.test(ch)) {
+          const d = document.createElement('span'); d.className = 'odigit';
+          const s = document.createElement('span'); s.className = 'ostrip';
+          for (let i = 0; i <= 9; i++) { const n = document.createElement('span'); n.textContent = i; s.appendChild(n); }
+          d.appendChild(s); this.el.appendChild(d);
+          this._cols.push({ s, digit: null });
+        } else {
+          const d = document.createElement('span'); d.className = 'osep'; d.textContent = ch;
+          this.el.appendChild(d); this._cols.push({ s: null });
+        }
+      }
+    }
+    for (let i = 0; i < str.length; i++) {
+      const col = this._cols[i];
+      if (col.s) {
+        const d = +str[i];
+        if (col.digit === null) {
+          col.s.style.transition = 'none';
+          col.s.style.transform = `translateY(-${d}em)`;
+          void col.s.offsetHeight;
+          col.s.style.transition = '';
+          col.digit = d;
+        } else if (col.digit !== d) {
+          col.s.style.transform = `translateY(-${d}em)`;
+          col.digit = d;
+        }
+      }
+    }
+    this._str = str;
+  }
+}
+
+/* 简单数字补间 */
+const tweens = new WeakMap();
+function rollText(el, to, decimals, dur = 650, suffix = '', sign = false) {
+  if (prefersReduced) { el.textContent = (sign && to >= 0 ? '+' : '') + to.toFixed(decimals) + suffix; tweens.set(el, to); return; }
+  const prev = tweens.get(el) ?? to;
+  tweens.set(el, to);
+  const start = performance.now();
+  const from = prev;
+  function step(now) {
+    const t = clamp((now - start) / dur, 0, 1);
+    const e = 1 - Math.pow(1 - t, 3);
+    const cur = from + (to - from) * e;
+    el.textContent = (sign && cur >= 0 ? '+' : '') + cur.toFixed(decimals) + suffix;
+    if (t < 1) requestAnimationFrame(step);
+    else el.textContent = (sign && to >= 0 ? '+' : '') + to.toFixed(decimals) + suffix;
+  }
+  requestAnimationFrame(step);
+}
+
+/* =========================================================================
+   本地偏好持久化
+   ========================================================================= */
+const LS_KEY = 'gfm.prefs.v1';
+function loadPrefs() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch (e) { return {}; } }
+function savePrefs() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ cat: activeCat, sortKey, sortDir, compareSel: state.compareSel })); } catch (e) { }
+}
+
+/* =========================================================================
+   市场状态（按真实时区计算）
+   ========================================================================= */
+const MARKETS = [
+  { name: 'A股', tz: 'Asia/Shanghai', sessions: [[9.5, 11.5], [13, 15]] },
+  { name: '港股', tz: 'Asia/Hong_Kong', sessions: [[9.5, 12], [13, 16]] },
+  { name: '美股', tz: 'America/New_York', sessions: [[9.5, 16]] },
+  { name: '日股', tz: 'Asia/Tokyo', sessions: [[9, 11.5], [12.5, 15]] },
+];
+function tzInfo(tz) {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+  const o = {};
+  parts.forEach(p => o[p.type] = p.value);
+  const hour = parseInt(o.hour, 10) % 24;
+  const minute = parseInt(o.minute, 10);
+  return { weekday: o.weekday, hm: hour + minute / 60 };
+}
+function marketState(m) {
+  const { weekday, hm } = tzInfo(m.tz);
+  if (weekday === 'Sat' || weekday === 'Sun') return { on: false, label: '休市' };
+  const inSession = m.sessions.some(([a, b]) => hm >= a && hm < b);
+  return inSession ? { on: true, label: '交易中' } : { on: false, label: '已收盘' };
+}
+function renderStatus() {
+  $('#statusbar').innerHTML = MARKETS.map(m => {
+    const s = marketState(m);
+    return `<span class="badge ${s.on ? 'live' : 'closed'}"><span class="dot"></span>${m.name}${s.label}</span>`;
+  }).join('');
+}
+
+/* =========================================================================
+   数据模型
+   ========================================================================= */
+const now = new Date();
+const DATES = [];
+for (let i = 29; i >= 0; i--) {
+  const d = new Date(now.getTime() - i * 86400000);
+  DATES.push((d.getMonth() + 1) + '/' + d.getDate());
+}
+
+const INDEX_DEFS = [
+  { id: 'hs300', name: '沪深300', code: '000300.SH', point: 3862.45, prev: 3821.10, seed: 11, vol: 0.006, drift: 0.0009 },
+  { id: 'zz500', name: '中证500', code: '000905.SH', point: 5684.72, prev: 5712.30, seed: 22, vol: 0.008, drift: 0.0004 },
+  { id: 'hsi', name: '恒生指数', code: 'HSI.HK', point: 19742.55, prev: 19865.20, seed: 33, vol: 0.009, drift: -0.0006 },
+  { id: 'ndx', name: '纳斯达克100', code: 'NDX.US', point: 20138.66, prev: 19982.40, seed: 44, vol: 0.010, drift: 0.0012 },
+  { id: 'spx', name: '标普500', code: 'SPX.US', point: 5612.30, prev: 5588.75, seed: 55, vol: 0.007, drift: 0.0008 },
+  { id: 'dji', name: '道琼斯', code: 'DJI.US', point: 41986.12, prev: 42110.55, seed: 66, vol: 0.006, drift: -0.0003 },
+  { id: 'n225', name: '日经225', code: 'N225.JP', point: 38521.90, prev: 38290.35, seed: 77, vol: 0.009, drift: 0.0010 },
+  { id: 'gold', name: '黄金ETF', code: '518880.SH', point: 5.812, prev: 5.774, seed: 88, vol: 0.005, drift: 0.0014, unit: '元', dec: 3 },
+];
+
+const state = { indices: [], funds: [], rankers: [], compareOptions: [], compareSel: [] };
+
+function buildIndices() {
+  state.indices = INDEX_DEFS.map(d => {
+    const series = genSeries(d.seed, 30, d.point, d.vol, d.drift);
+    const scale = d.point / series[series.length - 1];
+    const scaled = series.map(v => v * scale);
+    const chgPct = (d.point - d.prev) / d.prev * 100;
+    return { ...d, dec: d.dec ?? 2, series: scaled, chgPct, point: d.point };
+  });
+}
+
+const FUND_DEFS = [
+  // 国内宽基
+  { code: '510300', name: '华泰柏瑞沪深300ETF', cat: 'domestic', type: '宽基指数', nav: 3.9142, chg: 0.86, seed: 101 },
+  { code: '510500', name: '南方中证500ETF', cat: 'domestic', type: '宽基指数', nav: 6.1280, chg: -0.42, seed: 102 },
+  { code: '510050', name: '华夏上证50ETF', cat: 'domestic', type: '宽基指数', nav: 2.7355, chg: 0.61, seed: 103 },
+  { code: '159915', name: '易方达创业板ETF', cat: 'domestic', type: '宽基指数', nav: 2.0416, chg: -1.12, seed: 104 },
+  { code: '159949', name: '华安创业板50ETF', cat: 'domestic', type: '宽基指数', nav: 1.0288, chg: -0.95, seed: 105 },
+  { code: '000961', name: '天弘沪深300指数A', cat: 'domestic', type: '场外指数', nav: 1.6721, chg: 0.83, seed: 106 },
+  { code: '512100', name: '南方中证1000ETF', cat: 'domestic', type: '宽基指数', nav: 2.5874, chg: 0.34, seed: 107 },
+  { code: '515180', name: '易方达中证红利ETF', cat: 'domestic', type: '策略指数', nav: 1.3092, chg: 0.52, seed: 108 },
+  // 海外QDII
+  { code: '513100', name: '国泰纳斯达克100ETF', cat: 'overseas', type: 'QDII指数', nav: 1.5873, chg: 0.78, seed: 201 },
+  { code: '161125', name: '易方达标普500(LOF)', cat: 'overseas', type: 'QDII指数', nav: 2.2145, chg: 0.42, seed: 202 },
+  { code: '270042', name: '广发纳斯达克100', cat: 'overseas', type: 'QDII指数', nav: 4.7310, chg: 0.81, seed: 203 },
+  { code: '513500', name: '博时标普500ETF', cat: 'overseas', type: 'QDII指数', nav: 1.9462, chg: 0.39, seed: 204 },
+  { code: '159920', name: '华夏恒生ETF', cat: 'overseas', type: 'QDII指数', nav: 1.1268, chg: -0.62, seed: 205 },
+  { code: '513880', name: '华安日经225ETF', cat: 'overseas', type: 'QDII指数', nav: 1.4288, chg: 0.60, seed: 206 },
+  { code: '513130', name: '华夏恒生科技ETF', cat: 'overseas', type: 'QDII指数', nav: 0.9147, chg: -1.35, seed: 207 },
+  { code: '006327', name: '易方达中概互联50', cat: 'overseas', type: 'QDII指数', nav: 1.2055, chg: -0.88, seed: 208 },
+  // 黄金商品
+  { code: '518880', name: '华安黄金ETF', cat: 'commodity', type: '黄金商品', nav: 5.8120, chg: 0.66, seed: 301 },
+  { code: '159937', name: '博时黄金ETF', cat: 'commodity', type: '黄金商品', nav: 5.6312, chg: 0.61, seed: 302 },
+  { code: '159934', name: '易方达黄金ETF', cat: 'commodity', type: '黄金商品', nav: 5.5528, chg: 0.64, seed: 303 },
+  { code: '518800', name: '国泰黄金ETF', cat: 'commodity', type: '黄金商品', nav: 5.4901, chg: 0.58, seed: 304 },
+  { code: '161226', name: '国投瑞银白银(LOF)', cat: 'commodity', type: '白银商品', nav: 0.8214, chg: 1.24, seed: 305 },
+  { code: '160723', name: '嘉实原油(QDII-LOF)', cat: 'commodity', type: '原油商品', nav: 1.1086, chg: -1.02, seed: 306 },
+  { code: '501018', name: '南方原油(QDII)', cat: 'commodity', type: '原油商品', nav: 0.9643, chg: -0.91, seed: 307 },
+  { code: '161129', name: '易方达黄金主题(LOF)', cat: 'commodity', type: '黄金商品', nav: 1.2874, chg: 0.70, seed: 308 },
+];
+
+function buildFunds() {
+  state.funds = FUND_DEFS.map(d => {
+    const series = genSeries(d.seed, 30, d.nav, 0.006, d.chg / 100 / 30);
+    const scale = d.nav / series[series.length - 1];
+    const s = series.map(v => v * scale);
+    const rnd = mulberry32(d.seed + 7);
+    const m1 = d.chg + (rnd() * 6 - 2.2);
+    const m3 = d.chg * 2.1 + (rnd() * 14 - 5.5);
+    const y1 = d.chg * 3.4 + (rnd() * 34 - 9);
+    return { ...d, nav: d.nav, trend: s, m1, m3, y1 };
+  });
+}
+
+function buildRankers() {
+  const pool = [];
+  state.indices.forEach(x => pool.push({ name: x.name, code: x.code, chg: x.chgPct, val: fmt(x.point, x.dec), kind: '指数' }));
+  state.funds.forEach(f => pool.push({ name: f.name, code: f.code, chg: f.chg, val: fmt(f.nav, 4), kind: '基金' }));
+  state.rankers = pool;
+}
+
+function buildCompare() {
+  const opts = [
+    ...state.indices.map(x => ({ id: x.id, name: x.name, series: x.series })),
+    { id: 'fund510300', name: '沪深300ETF', series: state.funds.find(f => f.code === '510300').trend },
+    { id: 'fund513100', name: '纳指100ETF', series: state.funds.find(f => f.code === '513100').trend },
+    { id: 'fund159920', name: '恒生ETF', series: state.funds.find(f => f.code === '159920').trend },
+    { id: 'fund161226', name: '白银LOF', series: state.funds.find(f => f.code === '161226').trend },
+  ];
+  const palette = ['#f2c14e', '#2ae0d0', '#4f8cff', '#b57bff', '#ff8a3d', '#ff5e9c', '#5fe08a', '#ff4d5e', '#7fb0ff', '#d4a12a'];
+  opts.forEach((o, i) => o.color = palette[i % palette.length]);
+  state.compareOptions = opts;
+  state.compareSel = ['hs300', 'ndx', 'hsi', 'gold'];
+}
+
+/* =========================================================================
+   渲染：总览
+   ========================================================================= */
+const odometers = new Map();
+function renderIndices() {
+  const grid = $('#idxGrid');
+  grid.innerHTML = '';
+  state.indices.forEach((x, i) => {
+    const cls = dirClass(x.chgPct);
+    const card = document.createElement('div');
+    card.className = 'idx glass reveal';
+    card.dataset.id = x.id;
+    card.title = '点击加入 / 移出趋势对比';
+    card.setAttribute('role', 'button');
+    card.style.transitionDelay = (i * 0.04) + 's';
+    card.innerHTML = `
+      <div class="row1">
+        <div><div class="nm">${x.name}</div><div class="code">${x.code}</div></div>
+        <div class="chip ${cls}" id="chip-${x.id}">${fmtPct(x.chgPct)}</div>
+      </div>
+      <div class="pt"><span id="pt-${x.id}">0</span><span class="unit">${x.unit || '点'}</span></div>
+      <div class="meta"><span>昨收 <b id="prev-${x.id}">${fmt(x.prev, x.dec)}</b></span><span id="abs-${x.id}"></span></div>
+      <div class="spark" id="spark-${x.id}"></div>`;
+    grid.appendChild(card);
+    const od = new Odometer($('#pt-' + x.id), { decimals: x.dec });
+    odometers.set(x.id, od);
+    od.set(x.point);
+    updateIndexExtras(x);
+    onActivate(card, () => {
+      const added = toggleCompare(x.id);
+      if (added) toast('已加入趋势对比：' + x.name);
+    });
+  });
+  updatePickedCards();
+  revealObserve();
+}
+function updateIndexExtras(x) {
+  const cls = dirClass(x.chgPct);
+  const chip = $('#chip-' + x.id);
+  if (chip) { chip.className = 'chip ' + cls; chip.textContent = fmtPct(x.chgPct); }
+  const abs = $('#abs-' + x.id);
+  if (abs) { const a = x.point - x.prev; abs.textContent = (a >= 0 ? '+' : '') + fmt(a, x.dec); abs.className = cls; }
+  const sp = $('#spark-' + x.id);
+  if (sp) sp.innerHTML = sparkSVG(x.series.slice(-30), cls === 'u' ? '#ff4d5e' : cls === 'd' ? '#1fc98a' : '#8ba1c8');
+}
+function updatePickedCards() {
+  $$('.idx').forEach(c => {
+    const picked = state.compareSel.includes(c.dataset.id);
+    c.classList.toggle('picked', picked);
+    c.setAttribute('aria-pressed', picked ? 'true' : 'false');
+  });
+}
+
+/* =========================================================================
+   渲染：统计
+   ========================================================================= */
+function renderStats() {
+  const all = [...state.indices.map(x => x.chgPct), ...state.funds.map(f => f.chg)];
+  const up = all.filter(v => v > 0).length;
+  const down = all.filter(v => v < 0).length;
+  const flat = all.length - up - down;
+  const avg = all.reduce((a, b) => a + b, 0) / all.length;
+  $('#statUp').textContent = up;
+  $('#statDown').textContent = down;
+  $('#statUpSub').textContent = `占比 ${(up / all.length * 100).toFixed(0)}% · 平盘 ${flat}`;
+  $('#statDownSub').textContent = `占比 ${(down / all.length * 100).toFixed(0)}% · 统计 ${all.length} 只`;
+  const avgEl = $('#statAvg');
+  rollText(avgEl, avg, 2, 700, '%', true);
+  avgEl.className = 'v ' + dirClass(avg);
+  $('#statAvgSub').textContent = avg >= 0 ? '整体偏多，赚钱效应较强' : '整体偏空，观望情绪升温';
+}
+
+/* =========================================================================
+   渲染：涨跌榜（轮播）
+   ========================================================================= */
+let gainStart = 0, lossStart = 0;
+function buildRankPool() {
+  const gainers = state.rankers.slice().sort((a, b) => b.chg - a.chg);
+  const losers = state.rankers.slice().sort((a, b) => a.chg - b.chg);
+  return { gainers, losers };
+}
+function rankItem(item, rank) {
+  const cls = dirClass(item.chg);
+  const row = document.createElement('div');
+  row.className = 'ritem';
+  row.dataset.name = item.name;
+  row.innerHTML = `
+      <div class="rbadge">${rank}</div>
+      <div class="rname">${item.name}<small>${item.code}·${item.kind}</small></div>
+      <div class="rval">${item.val}</div>
+      <div class="rpct ${cls}">${fmtPct(item.chg)}</div>`;
+  return row;
+}
+function ensureTrack(el) {
+  if (!el._track) {
+    el.innerHTML = '<div class="rtrack"></div>';
+    el._track = el.querySelector('.rtrack');
+  }
+  return el._track;
+}
+function fillRankList(el, pool, start) {
+  const track = ensureTrack(el);
+  track.style.transition = 'none';
+  track.style.transform = 'translateY(0)';
+  track.innerHTML = '';
+  const n = pool.length;
+  for (let i = 0; i < 6; i++) track.appendChild(rankItem(pool[(start + i) % n], i + 1));
+}
+function slideRankList(el, pool, start) {
+  const track = ensureTrack(el);
+  if (prefersReduced || track.children.length !== 6) { fillRankList(el, pool, start); return; }
+  const n = pool.length;
+  track.appendChild(rankItem(pool[(start + 5) % n], 6));
+  const h = track.children[0].getBoundingClientRect().height || 47;
+  track.style.transition = 'none';
+  track.style.transform = 'translateY(0)';
+  void track.offsetHeight;
+  requestAnimationFrame(() => {
+    track.style.transition = 'transform .58s cubic-bezier(.22,1,.36,1)';
+    track.style.transform = `translateY(-${h}px)`;
+  });
+  let finished = false, guard = null, onEnd = null;
+  const done = () => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(guard);
+    track.removeEventListener('transitionend', onEnd);
+    if (track.firstChild) track.removeChild(track.firstChild);
+    track.style.transition = 'none';
+    track.style.transform = 'translateY(0)';
+    Array.from(track.children).forEach((c, i) => { const b = c.querySelector('.rbadge'); if (b) b.textContent = i + 1; });
+  };
+  onEnd = () => done();
+  guard = setTimeout(done, 720);
+  track.addEventListener('transitionend', onEnd);
+}
+function renderRanking(animate) {
+  const { gainers, losers } = buildRankPool();
+  const gl = $('#gainList'), ll = $('#lossList');
+  if (animate) {
+    slideRankList(gl, gainers, gainStart % gainers.length);
+    slideRankList(ll, losers, lossStart % losers.length);
+  } else {
+    fillRankList(gl, gainers, gainStart % gainers.length);
+    fillRankList(ll, losers, lossStart % losers.length);
+  }
+}
+
+/* =========================================================================
+   渲染：基金列表
+   ========================================================================= */
+const CATS = [
+  { id: 'domestic', label: '国内宽基' },
+  { id: 'overseas', label: '海外QDII' },
+  { id: 'commodity', label: '黄金商品' },
+];
+let activeCat = 'domestic';
+let sortKey = 'chg', sortDir = -1;
+let fundQuery = '';
+const sortSelEl = () => $('#sortSel');
+
+function renderTabs() {
+  const box = $('#tabs');
+  box.innerHTML = CATS.map(c => {
+    const cnt = state.funds.filter(f => f.cat === c.id).length;
+    return `<div class="tab ${c.id === activeCat ? 'on' : ''}" data-c="${c.id}" role="tab" aria-selected="${c.id === activeCat}">${c.label}<span class="cnt">${cnt}</span></div>`;
+  }).join('');
+  $$('.tab', box).forEach(t => onActivate(t, () => {
+    activeCat = t.dataset.c;
+    renderTabs(); renderFunds(); savePrefs();
+  }));
+}
+function tagClass(cat) { return cat === 'overseas' ? 'cyan' : cat === 'commodity' ? 'gold' : ''; }
+
+function currentFundRows() {
+  let rows = state.funds.filter(f => f.cat === activeCat);
+  if (fundQuery) {
+    const q = fundQuery.toLowerCase();
+    rows = rows.filter(f => f.name.toLowerCase().includes(q) || f.code.includes(q));
+  }
+  return rows.slice().sort((a, b) => {
+    const va = a[sortKey], vb = b[sortKey];
+    if (typeof va === 'string') return sortDir * va.localeCompare(vb, 'zh');
+    return sortDir * (va - vb);
+  });
+}
+function renderFunds() {
+  const rows = currentFundRows();
+  const body = $('#fundBody'); body.innerHTML = '';
+  const cards = $('#fundCards'); cards.innerHTML = '';
+  const countEl = $('#fundCount');
+  if (countEl) countEl.textContent = `${CATS.find(c => c.id === activeCat).label} · 共 ${rows.length} 只 · 点击表头或右上角下拉排序`;
+  if (!rows.length) {
+    body.innerHTML = `<tr><td class="empty" colspan="8">未找到匹配的基金</td></tr>`;
+    cards.innerHTML = `<div class="empty">未找到匹配的基金</div>`;
+    updateSortArrows(); return;
+  }
+  rows.forEach((f, i) => {
+    const c = dirClass(f.chg);
+    const m1 = dirClass(f.m1), m3 = dirClass(f.m3), y1 = dirClass(f.y1);
+    const spCol = c === 'u' ? '#ff4d5e' : c === 'd' ? '#1fc98a' : '#8ba1c8';
+    const spark = sparkSVG(f.trend.slice(-30), spCol, true);
+    const tr = document.createElement('tr');
+    tr.className = 'fadein';
+    tr.dataset.code = f.code;
+    tr.style.animationDelay = (i * 0.025) + 's';
+    tr.innerHTML = `
+      <td><div class="fname">${f.name}<small>${f.code}</small></div></td>
+      <td><span class="tag ${tagClass(f.cat)}">${f.type}</span></td>
+      <td data-nav>${fmt(f.nav, 4)}</td>
+      <td class="${c}" data-chg>${fmtPct(f.chg)}</td>
+      <td class="${m1}" data-m1>${fmtPct(f.m1)}</td>
+      <td class="${m3}" data-m3>${fmtPct(f.m3)}</td>
+      <td class="${y1}" data-y1>${fmtPct(f.y1)}</td>
+      <td><span class="minisvg" data-spark>${spark}</span></td>`;
+    body.appendChild(tr);
+
+    const card = document.createElement('div');
+    card.className = 'fcard fadein';
+    card.dataset.code = f.code;
+    card.style.animationDelay = (i * 0.025) + 's';
+    card.innerHTML = `
+      <div class="ftop">
+        <div class="fname">${f.name}<small>${f.code}</small></div>
+        <span class="tag ${tagClass(f.cat)}">${f.type}</span>
+      </div>
+      <div class="fprice"><span data-nav>${fmt(f.nav, 4)}</span><span class="${c}" data-chg>${fmtPct(f.chg)}</span></div>
+      <div class="fgrid">
+        <div>近1月<b class="${m1}" data-m1>${fmtPct(f.m1)}</b></div>
+        <div>近3月<b class="${m3}" data-m3>${fmtPct(f.m3)}</b></div>
+        <div>近1年<b class="${y1}" data-y1>${fmtPct(f.y1)}</b></div>
+      </div>
+      <div class="fspark" data-spark>${spark}</div>`;
+    cards.appendChild(card);
+  });
+  updateSortArrows();
+}
+function updateSortArrows() {
+  $$('#theadRow th').forEach(th => {
+    const on = th.dataset.key === sortKey;
+    th.classList.toggle('sorted', on);
+    const arr = th.querySelector('.arr');
+    if (arr) arr.textContent = sortDir > 0 ? '▲' : '▼';
+  });
+  const sel = sortSelEl();
+  if (sel && sel.value !== sortKey) sel.value = sortKey;
+}
+function setSort(key, dir) {
+  sortKey = key;
+  sortDir = dir;
+  renderFunds();
+  savePrefs();
+}
+function initSort() {
+  $$('#theadRow th').forEach(th => {
+    if (th.dataset.type === 'none') return;
+    onActivate(th, () => {
+      const k = th.dataset.key;
+      const dir = (k === sortKey) ? sortDir * -1 : (th.dataset.type === 'str' ? 1 : -1);
+      setSort(k, dir);
+    });
+  });
+  const sel = sortSelEl();
+  if (sel) sel.onchange = () => {
+    const k = sel.value;
+    setSort(k, k === 'name' ? 1 : -1);
+  };
+}
+
+/* =========================================================================
+   更新：刷新时只改数值，重绘迷你图
+   ========================================================================= */
+function flash(el, dir) {
+  if (prefersReduced || !dir || dir === 'f') return;
+  el.classList.remove('flash-u', 'flash-d');
+  void el.offsetWidth;
+  el.classList.add(dir === 'u' ? 'flash-u' : 'flash-d');
+}
+function updateFundCells() {
+  $$('[data-code]').forEach(node => {
+    const f = state.funds.find(x => x.code === node.dataset.code);
+    if (!f) return;
+    const c = dirClass(f.chg);
+    node.querySelectorAll('[data-nav]').forEach(el => { el.textContent = fmt(f.nav, 4); });
+    node.querySelectorAll('[data-chg]').forEach(el => {
+      el.textContent = fmtPct(f.chg);
+      el.className = c;
+      flash(el, c);
+    });
+    node.querySelectorAll('[data-m1]').forEach(el => { el.textContent = fmtPct(f.m1); el.className = dirClass(f.m1); });
+    node.querySelectorAll('[data-m3]').forEach(el => { el.textContent = fmtPct(f.m3); el.className = dirClass(f.m3); });
+    node.querySelectorAll('[data-y1]').forEach(el => { el.textContent = fmtPct(f.y1); el.className = dirClass(f.y1); });
+    const spCol = c === 'u' ? '#ff4d5e' : c === 'd' ? '#1fc98a' : '#8ba1c8';
+    const spark = sparkSVG(f.trend.slice(-30), spCol, true);
+    node.querySelectorAll('[data-spark]').forEach(el => { el.innerHTML = spark; });
+  });
+}
+
+/* =========================================================================
+   渲染：趋势对比
+   ========================================================================= */
+let chart = null;
+let comparePeriod = 30;
+let compareSig = '';
+function normalize(series) {
+  const base = series[0];
+  return series.map(v => +(v / base * 100).toFixed(3));
+}
+function renderChips() {
+  const box = $('#chips');
+  box.innerHTML = state.compareOptions.map(o => {
+    const on = state.compareSel.includes(o.id);
+    return `<div class="cchip ${on ? 'on' : ''}" data-id="${o.id}" role="button" aria-pressed="${on}" style="${on ? 'color:' + o.color : ''}">
+      <span class="sw" style="background:${o.color}"></span>${o.name}</div>`;
+  }).join('');
+  $$('.cchip', box).forEach(c => onActivate(c, () => toggleCompare(c.dataset.id)));
+}
+function toggleCompare(id) {
+  const i = state.compareSel.indexOf(id);
+  if (i >= 0) {
+    if (state.compareSel.length > 1) state.compareSel.splice(i, 1);
+  } else {
+    if (state.compareSel.length >= 6) { toast('最多同时对比 6 条曲线'); return false; }
+    state.compareSel.push(id);
+  }
+  renderChips(); updatePickedCards(); renderCompare(); savePrefs();
+  return i < 0;
+}
+function renderCompare() {
+  if (!chart) return;
+  const opts = state.compareOptions.filter(o => state.compareSel.includes(o.id));
+  const useDates = comparePeriod === 14 ? DATES.slice(-14) : DATES.slice(-30);
+  const series = opts.map(o => {
+    const raw = comparePeriod === 14 ? o.series.slice(-14) : o.series.slice(-30);
+    return {
+      name: o.name, type: 'line', smooth: true, symbol: 'circle', symbolSize: 5, showSymbol: false,
+      lineStyle: { width: 2.2, color: o.color }, itemStyle: { color: o.color },
+      emphasis: { focus: 'series' }, data: normalize(raw),
+    };
+  });
+  const option = {
+    backgroundColor: 'transparent',
+    animationDuration: 500, animationDurationUpdate: 650, animationEasingUpdate: 'cubicOut',
+    grid: { left: 46, right: 22, top: 30, bottom: 34 },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(9,16,31,.94)', borderColor: 'rgba(122,152,214,.28)', borderWidth: 1,
+      textStyle: { color: '#e9eefb', fontSize: 12, fontFamily: 'JetBrains Mono, monospace' },
+      axisPointer: { type: 'line', lineStyle: { color: 'rgba(242,193,78,.5)' } },
+      valueFormatter: v => (+v).toFixed(2),
+    },
+    legend: { show: false },
+    xAxis: {
+      type: 'category', boundaryGap: false, data: useDates,
+      axisLine: { lineStyle: { color: 'rgba(122,152,214,.28)' } },
+      axisLabel: { color: '#5d7296', fontSize: 11, fontFamily: 'JetBrains Mono, monospace', interval: Math.max(0, Math.ceil(useDates.length / 8) - 1) },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: 'value', scale: true,
+      axisLabel: { color: '#5d7296', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' },
+      splitLine: { lineStyle: { color: 'rgba(122,152,214,.09)' } },
+      axisLine: { show: false },
+    },
+    series: series.map((s, idx) => ({
+      ...s,
+      markLine: idx === 0 ? {
+        silent: true, symbol: 'none',
+        lineStyle: { color: 'rgba(242,193,78,.35)', type: 'dashed' },
+        label: { show: true, formatter: '基准 100', color: 'rgba(242,193,78,.7)', fontSize: 10, position: 'insideEndTop' },
+        data: [{ yAxis: 100 }],
+      } : undefined,
+    })),
+  };
+  const sig = state.compareSel.slice().sort().join(',') + '|' + comparePeriod;
+  const changed = sig !== compareSig;
+  compareSig = sig;
+  chart.setOption(option, changed);
+}
+function initCompare() {
+  if (!window.echarts) {
+    $('#chart').style.display = 'none';
+    $('#chartFallback').classList.add('show');
+    return;
+  }
+  chart = window.echarts.init($('#chart'), null, { renderer: 'canvas' });
+  renderChips();
+  renderCompare();
+  $$('#periodSeg button').forEach(b => onActivate(b, () => {
+    comparePeriod = +b.dataset.p;
+    $$('#periodSeg button').forEach(x => x.classList.toggle('on', x === b));
+    renderCompare();
+  }));
+  window.addEventListener('resize', () => chart && chart.resize());
+}
+
+/* =========================================================================
+   模拟刷新
+   ========================================================================= */
+function tick() {
+  lastTick = Date.now();
+  state.indices.forEach(x => {
+    const shock = (Math.random() + Math.random() - 1) * x.vol * x.point * 0.5;
+    x.point = Math.max(x.point + shock, x.point * 0.5);
+    x.chgPct = (x.point - x.prev) / x.prev * 100;
+    x.series.push(x.point);
+    x.series.shift();
+    const od = odometers.get(x.id);
+    if (od) od.set(x.point);
+    updateIndexExtras(x);
+  });
+  state.funds.forEach(f => {
+    const shock = (Math.random() + Math.random() - 1) * 0.0025;
+    f.nav = Math.max(f.nav * (1 + shock), 0.01);
+    f.chg = f.chg + (Math.random() + Math.random() - 1) * 0.12;
+    f.m1 += (Math.random() * 0.06 - 0.03);
+    f.m3 += (Math.random() * 0.08 - 0.04);
+    f.y1 += (Math.random() * 0.12 - 0.06);
+    f.trend.push(f.nav);
+    f.trend.shift();
+  });
+  buildRankers();
+  renderStats();
+  updateFundCells();
+  renderCompare();
+  setStamp();
+}
+function setStamp() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  $('#stamp').textContent = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+
+/* =========================================================================
+   定时器 / 暂停 / 进度
+   ========================================================================= */
+const REFRESH_MS = 6000;
+let lastTick = Date.now();
+let paused = false;
+const timers = { rank: null, refresh: null, status: null, ui: null };
+
+function updateProgress() {
+  const el = $('#progress');
+  if (!el) return;
+  if (paused) { el.style.width = '0%'; el.classList.add('paused'); return; }
+  el.classList.remove('paused');
+  const t = (Date.now() - lastTick) % REFRESH_MS;
+  el.style.width = (t / REFRESH_MS * 100).toFixed(1) + '%';
+}
+function startTimers() {
+  stopTimers();
+  timers.rank = setInterval(() => { gainStart++; lossStart++; renderRanking(true); }, 4000);
+  timers.refresh = setInterval(tick, REFRESH_MS);
+  timers.status = setInterval(renderStatus, 60000);
+  timers.ui = setInterval(updateProgress, 120);
+}
+function stopTimers() {
+  Object.keys(timers).forEach(k => { if (timers[k]) { clearInterval(timers[k]); timers[k] = null; } });
+}
+function setPauseIcon() {
+  const b = $('#pauseBtn');
+  if (!b) return;
+  b.innerHTML = paused
+    ? '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 1.5 10 6 2 10.5 Z" fill="currentColor"/></svg>'
+    : '<svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="1.5" width="2.8" height="9" rx="1" fill="currentColor"/><rect x="7.2" y="1.5" width="2.8" height="9" rx="1" fill="currentColor"/></svg>';
+  b.classList.toggle('paused', paused);
+  b.title = paused ? '继续自动刷新' : '暂停自动刷新';
+  b.setAttribute('aria-label', b.title);
+  const box = $('#stampBox');
+  if (box) box.classList.toggle('paused', paused);
+}
+function togglePause() {
+  paused = !paused;
+  if (paused) stopTimers();
+  else { lastTick = Date.now(); startTimers(); }
+  setPauseIcon();
+  updateProgress();
+  toast(paused ? '已暂停自动刷新' : '已恢复自动刷新');
+}
+
+/* =========================================================================
+   交互辅助
+   ========================================================================= */
+let toastT;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 1800);
+}
+let revealObserver;
+function revealObserve() {
+  if (!('IntersectionObserver' in window)) { $$('.reveal').forEach(el => el.classList.add('in')); return; }
+  if (!revealObserver) {
+    revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); revealObserver.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+  }
+  $$('.reveal').forEach(el => revealObserver.observe(el));
+}
+function initScrollSpy() {
+  const links = $$('#nav a');
+  const secs = links.map(a => $(a.getAttribute('href')));
+  const onScroll = () => {
+    let idx = 0;
+    const y = window.scrollY + 140;
+    secs.forEach((s, i) => { if (s && s.offsetTop <= y) idx = i; });
+    links.forEach((a, i) => a.classList.toggle('active', i === idx));
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+}
+
+/* =========================================================================
+   启动
+   ========================================================================= */
+function applyPrefs() {
+  const p = loadPrefs();
+  if (p.cat && CATS.some(c => c.id === p.cat)) activeCat = p.cat;
+  if (p.sortKey) sortKey = p.sortKey;
+  if (typeof p.sortDir === 'number') sortDir = p.sortDir;
+  if (Array.isArray(p.compareSel)) {
+    const valid = p.compareSel.filter(id => state.compareOptions.some(o => o.id === id));
+    if (valid.length) state.compareSel = valid.slice(0, 6);
+  }
+}
+function boot() {
+  buildIndices();
+  buildFunds();
+  buildRankers();
+  buildCompare();
+  applyPrefs();
+
+  renderStatus();
+  renderIndices();
+  renderStats();
+  renderRanking(false);
+  renderTabs();
+  initSort();
+  renderFunds();
+  initCompare();
+  initScrollSpy();
+  setStamp();
+  setPauseIcon();
+  updateProgress();
+  $('#year').textContent = new Date().getFullYear();
+  revealObserve();
+
+  const search = $('#fundSearch');
+  if (search) search.addEventListener('input', () => { fundQuery = search.value.trim(); renderFunds(); });
+  const pb = $('#pauseBtn');
+  if (pb) pb.addEventListener('click', togglePause);
+
+  startTimers();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopTimers();
+    else if (!paused) { lastTick = Date.now(); startTimers(); }
+  });
+}
+document.addEventListener('DOMContentLoaded', boot);
+</script>
+</body>
+</html>
