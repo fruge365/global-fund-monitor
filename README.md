@@ -1,12 +1,23 @@
-# 环球基金行情看板 · Global Fund Monitor
+# 🌐 环球基金行情看板 · Global Fund Monitor
 
-国内外基金与指数涨跌监控看板，深色金融科技风格，单文件 HTML + 原生 JS 实现，图表基于 ECharts（CDN）。用于演示跨市场行情监控的交互与可视化效果。
+[![零依赖](https://img.shields.io/badge/零依赖-vanilla%20js-2E8B8B?style=flat-square)](#技术说明)
+[![ECharts](https://img.shields.io/badge/ECharts-5.5-AA344D?style=flat-square)](https://echarts.apache.org/)
+[![License](https://img.shields.io/badge/license-学习与演示-B29A6B?style=flat-square)](#许可)
+
+国内外基金与指数涨跌监控看板，深色金融科技风格。**单文件 HTML + 原生 JS**，无框架、无构建步骤，图表基于 ECharts（CDN）加载。
+
+**在线预览**：https://fruge365.github.io/global-fund-monitor/
+**源码**：https://github.com/fruge365/global-fund-monitor
+
+> ⚠️ 本页为演示环境，行情与净值数据由前端模拟引擎生成，**不代表任何真实市场报价**，不构成投资建议。
+
 
 ## 在线预览
 
-https://8000-c956a2a8aeaefe27.code.cosmoplat.cn
+- **GitHub Pages**：https://fruge365.github.io/global-fund-monitor/（由 `main` 分支自动部署）
+- **原演示环境**：https://8000-c956a2a8aeaefe27.code.cosmoplat.cn（需要访问方可打开，若无法访问请按下方「快速开始」本地运行）
 
-> 提示：预览环境需要访问方可打开，若无法访问请自行运行本地服务（见下方「快速开始」）。
+> 演示数据由前端模拟引擎生成，每 6 秒刷新一次，仅用于交互与视觉展示。
 
 ## 功能特性
 
@@ -66,6 +77,23 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## 数据说明与风险提示
 
 本页为演示环境，行情与净值数据由前端模拟引擎生成，仅用于交互与视觉展示，不代表任何真实市场报价。基金过往业绩及其净值高低不预示未来表现，投资有风险，入市需谨慎。本页不构成任何投资建议，请以基金公司及交易所官方披露数据为准。
+
+## 常见问题
+
+**页面打开是空白？**
+项目依赖 ECharts CDN。离线或网络受限时会无法渲染图表，请确保能访问 CDN，或自行把 ECharts 脚本下载到本地并改写 `index.html` 里的 `<script src>`。
+
+**数值看起来一直在跳？**
+这是预期的演示行为：模拟引擎每 4 秒轮播涨跌榜、每 6 秒整体刷新并触发 odometer 数字滚动。要停止模拟，在 `index.html` 里停掉对应的定时器即可。
+
+**手机上看表格很挤？**
+基金列表在窄屏会自动切换为卡片视图。若仍拥挤，请在 `<meta name="viewport">` 之后检查是否被外部样式覆盖了媒体查询断点。
+
+**交易状态是按什么判断的？**
+按真实时区实时计算 A股 / 港股 / 美股 / 日股的盘中、休市状态，并非写死的时间表。跨时区或调整系统时间会导致显示变化，属正常现象。
+
+**能接真实行情吗？**
+本项目只做前端演示，没有后端与行情源。要接真实数据需自行增加数据接口层，并替换 `index.html` 内的模拟数据生成逻辑。
 
 ## 许可
 
